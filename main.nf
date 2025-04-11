@@ -1,0 +1,185 @@
+nextflow.enable.dsl = 2
+
+
+include {
+    place_contigs;
+    assign_terminal_repeat_regions;
+    align_with_terminal_repeats;
+    medaka_polish as medaka_polish_draft;
+    minimap as minimap_reads_to_draft;
+    minimap_eqx as minimap_contigs_to_draft;
+    minimap as minimap_reads_to_ref;
+    minimap as minimap_contigs_to_ref;
+    medaka_polish;
+    correct_and_mask_consensus;
+    evaluate_contigs;
+    // annotation
+    mafft_align;
+    shift_gaps;
+    variants_from_alignment;
+    variants_report;
+    annotate_cds_changes;
+    mutational_spectrum;
+    annotate_aa_changes;
+    // general
+    output
+} from './lib/processes.nf'
+
+
+workflow draft_genome {
+    take:
+        meta
+    main:
+        raw_draft = meta
+        | map {meta -> [meta, meta.reference, meta.contigs]}
+        | place_contigs
+
+        tr_annotated_draft = raw_draft
+        | map { meta, draft, log -> [meta, meta.reference, draft, meta.trl_end, meta.trr_start]}
+        | assign_terminal_repeat_regions
+
+        polished_draft = tr_annotated_draft
+        | map {meta, draft, alignment, tr_range -> [meta, draft, meta.reads, tr_range]}
+        | align_with_terminal_repeats
+        | map {meta, draft, bam, bai -> [meta, draft, bam, bai, params.medaka_consensus_model]}
+        | medaka_polish
+
+        alignments_reads_to_polished = polished_draft 
+        | map {meta, draft -> [meta, draft, meta.reads]}
+        | minimap_reads_to_draft
+
+        corrected_draft = alignments_reads_to_polished
+        | correct_and_mask_consensus
+
+        // Alignments for troubleshooting/further analysis
+        // 1 - map contigs to polished draft
+        contigs_mapped_to_polished = polished_draft
+        | map {meta, draft -> [meta, draft, meta.contigs]}
+        | minimap_contigs_to_draft
+
+        contigs_eval = contigs_mapped_to_polished
+        | map {meta, ref, bam, bai -> [meta, bam, bai]}
+        | evaluate_contigs
+
+        // 2 - map contigs to reference sequence (output directory: ref.fasta, mapped.bam, mapped.bam.bai)
+        contigs_mapped_to_ref = meta
+        | map {meta -> [meta, meta.reference, meta.contigs]}
+        | minimap_contigs_to_ref
+
+        // 3 - map reads to reference sequence (output directory: ref.fasta, mapped.bam, mapped.bam.bai)
+        reads_mapped_to_ref = meta
+        | map {meta -> [meta, meta.reference, meta.reads]}
+        | minimap_reads_to_ref
+
+        write_this = Channel.empty()
+        | mix(
+            raw_draft | map {meta, draft, log -> [draft, 'draft', 'draft.fasta']},
+            raw_draft | map {meta, draft, log -> [log, 'logs', 'draft.log']},
+            tr_annotated_draft | map {meta, draft, alignment, tr_range -> [alignment, 'repeat_transfer', 'alignment.fasta']},
+            tr_annotated_draft | map {meta, draft, alignment, tr_range -> [alignment, 'repeat_transfer', 'range.txt']},
+            polished_draft | map {meta, draft -> [draft, 'draft', 'polished.fasta']},
+            alignments_reads_to_polished | map {meta, draft, bam, bai -> [bam, 'alignments', 'reads_vs_polished.bam']},
+            alignments_reads_to_polished | map {meta, draft, bam, bai -> [bai, 'alignments', 'reads_vs_polished.bam.bai']},
+            corrected_draft | map {meta, draft, table -> [draft, 'draft', 'corrected.fasta']},
+            corrected_draft | map {meta, draft, table -> [table, 'draft', 'corrected_basecounts.tsv']},
+            contigs_mapped_to_polished | map {meta, draft, bam, bai -> [bam, 'alignments', 'contigs_vs_polished.bam']},
+            contigs_mapped_to_polished | map {meta, draft, bam, bai -> [bai, 'alignments', 'contigs_vs_polished.bam.bai']},
+            contigs_mapped_to_ref | map {meta, draft, bam, bai -> [bam, 'alignments', 'contigs_vs_ref.bam']},
+            contigs_mapped_to_ref | map {meta, draft, bam, bai -> [bai, 'alignments', 'contigs_vs_ref.bam.bai']},
+            reads_mapped_to_ref | map {meta, draft, bam, bai -> [bam, 'alignments', 'reads_vs_ref.bam']},
+            reads_mapped_to_ref | map {meta, draft, bam, bai -> [bai, 'alignments', 'reads_vs_ref.bam.bai']},
+            contigs_eval | map {meta, table -> [table, 'stats', 'contigs_eval.tsv']}
+        )
+    emit:
+        // emit everything that is used next
+        draft = corrected_draft
+        write_this = write_this
+}
+
+
+workflow annotate_draft {
+    take:
+        draft_ref
+    main:
+        alignment = draft_ref
+        | map {meta -> [meta, [meta.reference, meta.draft]]}
+        | mafft_align
+        | shift_gaps
+
+        variants = alignment
+        | map {meta, alignment -> [meta, alignment, meta.basecounts]}
+        | variants_from_alignment
+
+        variant_report = variants
+        | map {meta, vcf, tbi -> [meta, meta.genbank, vcf, tbi]}
+        | variants_report
+
+        aa_report = alignment
+        | map {meta, alignment -> [meta, alignment, meta.genbank]}
+        | annotate_cds_changes
+
+        vcf_variants = variants
+        | map {meta, vcf, tbi -> [meta, meta.genbank, vcf, tbi]}
+        | annotate_aa_changes
+
+        mut_spec = variants
+        | map {meta, vcf, tbi -> [meta, meta.reference, vcf, tbi]}
+        | mutational_spectrum
+
+        write_this = Channel.empty()
+        | mix(
+            alignment | map {meta, align -> [align, 'annotation', 'alignment.fasta']},
+            variant_report | map {meta, report -> [report, 'annotation', 'variant_report.txt']},
+            vcf_variants | map {meta, vcf, tbi, genetable, var_summary -> [vcf, 'annotation', 'variants.vcf.gz']},
+            vcf_variants | map {meta, vcf, tbi, genetable, var_summary -> [tbi, 'annotation', 'variants.vcf.gz.tbi']},
+            vcf_variants | map {meta, vcf, tbi, genetable, var_summary -> [genetable, 'annotation', 'gene_variant_summary.txt']},
+            vcf_variants | map {meta, vcf, tbi, genetable, var_summary -> [var_summary, 'annotation', 'variant_summary.html']},
+            aa_report | map {meta, aa_align, transfers -> [aa_align, 'annotation', 'protein_alignments.txt']},
+            aa_report | map {meta, aa_align, transfers -> [transfers, 'annotation', 'cds_transfer.tsv']},
+            mut_spec | map {meta, pairs, triples -> [pairs, 'annotation', 'mut_pairs.tsv']},
+            mut_spec | map {meta, pairs, triples -> [triples, 'annotation', 'mut_triples.tsv']}
+        )
+    emit:
+        write_this = write_this
+}
+
+// other workflows
+// - assembly
+
+
+workflow {
+
+    // TODO: incorporate assembly
+
+    if(params.draft == null) {
+        input = Channel.of([
+            "draft_name": params.draft_name,
+            "contigs": params.contigs,
+            "reference": params.reference,
+            "reads": params.reads,
+            "trl_end": params.reference_terminal_repeat_left_end,
+            "trr_start": params.reference_terminal_repeat_right_start
+        ])
+        draft_results = input | draft_genome
+        draft = draft_results.draft | map { meta, draft, basecounts -> [draft, basecounts] }
+    } else {
+        draft_results = null
+        draft = Channel.of([params.draft, params.basecounts])
+    }
+
+    annotation = draft
+    | map { draft, basecounts -> [
+        "reference": params.reference,
+        "draft": draft,
+        "genbank": params.reference_genbank,
+        "basecounts": basecounts
+    ] }
+    | annotate_draft
+
+    Channel.empty()
+    | mix(
+        (draft_results ? draft_results.write_this : Channel.empty()),
+        annotation.write_this
+    )
+    | output
+}
