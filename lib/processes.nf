@@ -214,6 +214,7 @@ process variants_from_alignment {
     """
 }
 
+
 process variants_report {
     label "common"
     cpus 1
