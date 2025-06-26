@@ -134,7 +134,7 @@ process sniffles {
 
 
 process structural_variant_consensus {
-    label "common"
+    label "structural_variants"
     input:
         tuple val(meta),
             path("ref.fasta"),
