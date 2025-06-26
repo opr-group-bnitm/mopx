@@ -2,10 +2,17 @@ nextflow.enable.dsl = 2
 
 
 include {
+    split_ref;
+    sniffles;
+    structural_variant_consensus;
+    merge_predraft;
     place_contigs;
     assign_terminal_repeat_regions;
     align_with_terminal_repeats;
+    medaka_polish as medaka_polish_predraft;
     medaka_polish as medaka_polish_draft;
+    minimap as minimap_to_separated_ref;
+    minimap as minimap_to_separated_ref_sv;
     minimap as minimap_reads_to_draft;
     minimap_eqx as minimap_contigs_to_draft;
     minimap as minimap_reads_to_ref;
@@ -30,8 +37,36 @@ workflow draft_genome {
     take:
         meta
     main:
-        raw_draft = meta
-        | map {meta -> [meta, meta.reference, meta.contigs]}
+
+        // part 1: build pre-draft
+        ref_split = meta
+        | map {meta -> [meta, params.reference_terminal_repeat_left_end, meta.reference]}
+        | split_ref
+
+        refs_in_pieces = ref_split.itr
+        | mix(ref_split.core)
+
+        predraft = refs_in_pieces
+        | map {meta, ref -> [meta, ref, meta.reads]}
+        | minimap_to_separated_ref
+        | sniffles
+        | structural_variant_consensus
+        | map {meta, sv_consensus -> [meta, sv_consensus, meta.reads]}
+        | minimap_to_separated_ref_sv
+        | map {meta, draft, bam, bai -> [meta, draft, bam, bai, params.medaka_consensus_model]}
+        | medaka_polish_predraft
+        | map {meta, segment -> [meta.runid, segment]}
+        | groupTuple(by: 0)
+        | merge_predraft
+
+        predraft_with_meta = meta
+        | map {meta -> [meta.runid, meta]}
+        | join(predraft, by: 0)
+        | map {runid, meta, predraft -> [meta, predraft]}
+
+        // part 2: place contigs
+        raw_draft = predraft_with_meta
+        | map {meta, predraft -> [meta, predraft, meta.contigs]}
         | place_contigs
 
         tr_annotated_draft = raw_draft
@@ -153,6 +188,7 @@ workflow {
 
     if(params.draft == null) {
         input = Channel.of([
+            "runid": "run",
             "draft_name": params.draft_name,
             "contigs": params.contigs,
             "reference": params.reference,

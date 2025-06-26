@@ -1,6 +1,39 @@
 nextflow.enable.dsl = 2
 
 
+process split_ref {
+    label "common"
+    cpus 1
+    input:
+        tuple val(meta), val(itr_len), path('ref.fasta')
+    output:
+        tuple val(meta), path('itr.fasta'), emit: itr
+        tuple val(meta), path('body.fasta'), emit: core
+    """
+    #!/usr/bin/env python
+
+    from Bio import SeqIO
+    from Bio.SeqRecord import SeqRecord
+
+    ref = SeqIO.read('ref.fasta', 'fasta')
+
+    itr_record = SeqRecord(
+        id='ITR',
+        description=f"ref={ref.id}",
+        seq=ref.seq[:${itr_len}],
+    )
+    body_record = SeqRecord(
+        id='core_region',
+        description=f"ref={ref.id}",
+        seq=ref.seq[${itr_len}:-${itr_len}],
+    )
+
+    SeqIO.write(itr_record, 'itr.fasta', 'fasta')
+    SeqIO.write(body_record, 'body.fasta', 'fasta')
+    """
+}
+
+
 process minimap {
     label "common"
     cpus 2
@@ -29,6 +62,97 @@ process minimap_eqx {
     | samtools view -b -o mapped.bam
     samtools sort -o sorted.bam mapped.bam
     samtools index sorted.bam
+    """
+}
+
+
+// process subsample_alignments {
+//     label "common"
+//     cpus 1
+//     input:
+//         tuple val(meta), path("ref.fasta"), path("in.bam"), path("in.bam.bai")
+//     output:
+//         tuple val(meta), path("ref.fasta"), path("out.bam"), path("out.bam.bai")
+//     """
+//     target_coverage=${params.sniffles_predraft_cap_coverage}
+//     if [[ \$target_coverage -gt 0 ]]
+//     then
+//         samtools dict ref.fasta -o ref.dict
+
+//         jvarkit sortsamrefname in.bam | samtools view -b > refname_sorted.bam
+//         jvarkit biostar154220 -R ref.fasta -n \$target_coverage refname_sorted.bam -o capped.bam
+
+//         samtools sort capped.bam -o out.bam
+//         samtools index out.bam
+//     else
+//         mv in.bam out.bam
+//         mv in.bam.bai out.bam.bai
+//     fi
+//     """
+// }
+
+
+process sniffles {
+    label "common"
+    cpus 2
+    memory 10
+    input:
+        tuple val(meta),
+            path("ref.fasta"),
+            path("mapped_to_ref.bam"),
+            path("mapped_to_ref.bam.bai")
+    output:
+        tuple val(meta), path("ref.fasta"), path("sv.filtered.vcf")
+    """
+    if [[ \$(samtools view mapped_to_ref.bam | wc -l) -ne 0 ]]
+    then
+        set +e
+        sniffles \\
+            -t ${task.cpus} \\
+            --input mapped_to_ref.bam \\
+            --reference ref.fasta \\
+            --vcf sv.vcf \\
+            --minsupport ${params.sniffles_predraft_min_support} \\
+            --minsvlen ${params.sniffles_predraft_min_sv_len}
+        set -e
+
+        bcftools view -i 'INFO/AF>=${params.sniffles_predraft_min_variant_allele_fraction}' sv.vcf -Ov -o sv.filtered.vcf
+    else
+        # create an empty vcf file
+        refid=\$(head -n 1 ref.fasta | sed 's/^>//' | awk '{print \$1}')
+        reflen=\$(grep -v '^>' ref.fasta | tr -d '\\n' | wc -c)
+
+        # Create the minimal VCF
+        {
+            echo "##fileformat=VCFv4.2"
+            echo "##contig=<ID=\$refid,length=\$reflen>"
+            echo -e "#CHROM\\tPOS\\tID\\tREF\\tALT\\tQUAL\\tFILTER\\tINFO"
+        } > sv.filtered.vcf
+    fi
+    """
+}
+
+
+process structural_variant_consensus {
+    label "common"
+    input:
+        tuple val(meta),
+            path("ref.fasta"),
+            path("sv.filtered.vcf")
+    output:
+        tuple val(meta),
+            path("sv_consensus.fasta")
+    """
+    if [[ \$(bcftools view -H sv.filtered.vcf | wc -l) -ne 0 ]]
+    then
+      bcftools sort sv.filtered.vcf -Oz -o structural_variants.vcf.gz
+      tabix structural_variants.vcf.gz
+      bcftools consensus \\
+        --fasta-ref ref.fasta \\
+        -o sv_consensus.fasta structural_variants.vcf.gz
+    else
+      cp ref.fasta sv_consensus.fasta
+    fi
     """
 }
 
@@ -63,6 +187,42 @@ process medaka_polish {
     medaka sequence consensus_probs.hdf draft.fasta polished.fasta \
         --threads $task.cpus \
         || { echo "Consensus stitching failed."; exit 1; }
+    """
+}
+
+
+process merge_predraft {
+    label "common"
+    cpus 1
+    input:
+        tuple val(meta), path("segment_*.fasta")
+    output:
+        tuple val(meta), path("merged.fasta")
+    """
+    #!/usr/bin/env python3
+
+    import glob
+    from Bio import SeqIO
+    from Bio.SeqRecord import SeqRecord
+
+    sequences = [SeqIO.read(fn, 'fasta') for fn in glob.glob("segment_*.fasta")]
+    itr_seqs = [s for s in sequences if s.id == "ITR"]
+    core_seqs = [s for s in sequences if s.id == "core_region"]
+
+    assert len(itr_seqs) == 1
+    assert len(core_seqs) == 1
+
+    itr = itr_seqs[0]
+    core = core_seqs[0]
+    full_seq = itr.seq + core.seq + itr.seq.reverse_complement()
+
+    outseq = SeqRecord(
+        id="PreDraft",
+        description=itr.description,
+        seq=full_seq
+    )
+
+    SeqIO.write(outseq, 'merged.fasta', 'fasta')
     """
 }
 
