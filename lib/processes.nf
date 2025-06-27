@@ -1,6 +1,85 @@
 nextflow.enable.dsl = 2
 
 
+process canu {
+    label "canu"
+    cpus 16
+    memory 30
+    input:
+        tuple val(meta), path(reads)
+    output:
+        tuple val(meta), path('canu_contigs.fasta')
+    """
+    canu \\
+        -nanopore-raw ${reads} \\
+        -p asm \\
+        -d out \\
+        genomeSize=${params.canu_genome_size} \\
+        minReadLength=${params.canu_min_read_length} \\
+        minOverlapLength=${params.canu_min_overlap_length} \\
+        stopOnLowCoverage=${params.canu_stop_on_low_coverage} \\
+        maxThreads=${task.cpus} \\
+        maxMemory=${task.memory.toGiga()}g
+
+    mv out/asm.contigs.fasta canu_contigs.fasta
+    """
+}
+
+
+process pop_canu_bubbles {
+    label "common"
+    cpus 1
+    input:
+        tuple val(meta), path('canu_contigs.fasta')
+    output:
+        tuple val(meta), path('canu_contigs.nobbubles.fasta')
+    """
+    #!/usr/bin/env python
+
+    from Bio import SeqIO
+
+    with open('canu_contigs.nobbubles.fasta', 'w') as out_handle:
+        for record in SeqIO.parse('canu_contigs.fasta', 'fasta'):
+            if 'suggestBubble=yes' not in record.description:
+                SeqIO.write(record, out_handle, 'fasta')
+    """
+}
+
+
+process flye {
+    label "flye"
+    cpus 16
+    memory 30
+    input:
+        tuple val(meta), path(reads)
+    output:
+        tuple val(meta), path('flye_contigs.fasta')
+    """
+    flye \\
+        --nano-raw ${reads} \\
+        --out-dir out \\
+        --genome-size ${params.flye_genome_size} \\
+        --threads 
+    """
+}
+
+
+process merge_and_cluster {
+    label "common"
+    input:
+        tuple val(meta), path('contigs_*.fasta')
+    output:
+        tuple val(meta), path('clustered.fasta')
+    """
+    cat contigs_*.fasta > merged.fasta
+    cd-hit-est \\
+        -n ${params.contigs_cluster_cdhit_wordlen} \\
+        -c ${params.contigs_cluster_cdhit_min_similarity} \\
+        -i merged.fasta -o clustered.fasta
+    """
+}
+
+
 process split_ref {
     label "common"
     cpus 1
@@ -64,32 +143,6 @@ process minimap_eqx {
     samtools index sorted.bam
     """
 }
-
-
-// process subsample_alignments {
-//     label "common"
-//     cpus 1
-//     input:
-//         tuple val(meta), path("ref.fasta"), path("in.bam"), path("in.bam.bai")
-//     output:
-//         tuple val(meta), path("ref.fasta"), path("out.bam"), path("out.bam.bai")
-//     """
-//     target_coverage=${params.sniffles_predraft_cap_coverage}
-//     if [[ \$target_coverage -gt 0 ]]
-//     then
-//         samtools dict ref.fasta -o ref.dict
-
-//         jvarkit sortsamrefname in.bam | samtools view -b > refname_sorted.bam
-//         jvarkit biostar154220 -R ref.fasta -n \$target_coverage refname_sorted.bam -o capped.bam
-
-//         samtools sort capped.bam -o out.bam
-//         samtools index out.bam
-//     else
-//         mv in.bam out.bam
-//         mv in.bam.bai out.bam.bai
-//     fi
-//     """
-// }
 
 
 process sniffles {

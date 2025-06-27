@@ -38,6 +38,13 @@ workflow draft_genome {
         meta
     main:
 
+        // TODO:
+        // - filter the reads
+        // - run flye
+        // - run canu
+        // - pop canu bubbles
+        // - cdhit
+
         // part 1: build pre-draft
         ref_split = meta
         | map {meta -> [meta, params.reference_terminal_repeat_left_end, meta.reference]}
@@ -184,7 +191,10 @@ workflow annotate_draft {
 
 workflow {
 
-    // TODO: incorporate assembly
+    // TODO:
+    // - filter reads
+    // - assembly (canu + flye)
+    // - report + output
 
     if(params.draft == null) {
         input = Channel.of([
