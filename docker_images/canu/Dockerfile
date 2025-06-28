@@ -1,16 +1,45 @@
-# Start from a base image that includes Miniconda
+# Use Miniconda as the base image
 FROM continuumio/miniconda3
+
+# Set environment variables to avoid prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Set the working directory
 WORKDIR /app
 
-# Copy the environment.yml file into the container
-COPY canu.yaml .
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y \
+    build-essential \
+    g++ \
+    wget \
+    zlib1g-dev \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    default-jdk \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create the Conda environment from the environment.yml file
-RUN conda env create -f canu.yaml
+# Set Canu version
+ENV CANU_VERSION=2.2
 
-# Set the active environment
+# Download and install Canu
+RUN wget https://github.com/marbl/canu/releases/download/v$CANU_VERSION/canu-$CANU_VERSION.Linux-amd64.tar.xz && \
+    tar -xvf canu-$CANU_VERSION.Linux-amd64.tar.xz && \
+    mv canu-$CANU_VERSION /usr/local/canu && \
+    chmod +x /usr/local/canu/bin/canu && \
+    ln -s /usr/local/canu/bin/canu /usr/local/bin/canu
+
+# Add Canu to PATH
+ENV PATH="/usr/local/canu/bin:$PATH"
+
+# Copy the Conda environment YAML file into the container
+COPY env.yaml .
+
+# Create the Conda environment
+RUN conda env create -f env.yaml
+
+# Set the active Conda environment
 SHELL ["/bin/bash", "-c"]
-RUN echo "source activate canu" > ~/.bashrc
-ENV PATH /opt/conda/envs/canu/bin:$PATH
+RUN echo "source activate env" > ~/.bashrc
+ENV PATH /opt/conda/envs/env/bin:$PATH

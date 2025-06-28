@@ -4,7 +4,7 @@ nextflow.enable.dsl = 2
 process canu {
     label "canu"
     cpus 16
-    memory 30
+    memory "30 GB"
     input:
         tuple val(meta), path(reads)
     output:
@@ -19,6 +19,7 @@ process canu {
         minOverlapLength=${params.canu_min_overlap_length} \\
         stopOnLowCoverage=${params.canu_stop_on_low_coverage} \\
         maxThreads=${task.cpus} \\
+        minInputCoverage=${params.canu_min_input_coverage} \\
         maxMemory=${task.memory.toGiga()}g
 
     mv out/asm.contigs.fasta canu_contigs.fasta
@@ -49,7 +50,7 @@ process pop_canu_bubbles {
 process flye {
     label "flye"
     cpus 16
-    memory 30
+    memory "30 GB"
     input:
         tuple val(meta), path(reads)
     output:
@@ -59,7 +60,9 @@ process flye {
         --nano-raw ${reads} \\
         --out-dir out \\
         --genome-size ${params.flye_genome_size} \\
-        --threads 
+        --threads ${task.cpus}
+
+    mv out/assembly.fasta flye_contigs.fasta
     """
 }
 
@@ -146,9 +149,9 @@ process minimap_eqx {
 
 
 process sniffles {
-    label "common"
+    label "structural_variants"
     cpus 2
-    memory 10
+    memory "10 GB"
     input:
         tuple val(meta),
             path("ref.fasta"),

@@ -2,6 +2,10 @@ nextflow.enable.dsl = 2
 
 
 include {
+    canu;
+    pop_canu_bubbles;
+    flye;
+    merge_and_cluster;
     split_ref;
     sniffles;
     structural_variant_consensus;
@@ -33,17 +37,31 @@ include {
 } from './lib/processes.nf'
 
 
+workflow de_novo_assemblies {
+    take:
+        reads
+    main:
+        canu_assemblies = reads
+        | canu
+        | pop_canu_bubbles
+    
+        flye_assemblies = reads
+        | flye
+
+        assemblies_merged = canu_assemblies
+        | mix(flye_assemblies)
+        | groupTuple(by: 0)
+        | merge_and_cluster
+
+    emit:
+        contigs = assemblies_merged
+}
+
+
 workflow draft_genome {
     take:
         meta
     main:
-
-        // TODO:
-        // - filter the reads
-        // - run flye
-        // - run canu
-        // - pop canu bubbles
-        // - cdhit
 
         // part 1: build pre-draft
         ref_split = meta
@@ -185,28 +203,30 @@ workflow annotate_draft {
         write_this = write_this
 }
 
-// other workflows
-// - assembly
-
 
 workflow {
 
-    // TODO:
-    // - filter reads
-    // - assembly (canu + flye)
-    // - report + output
+    if(params.contigs == null ) {
+        assembly_out = Channel.of(["runid", params.reads])
+        | de_novo_assemblies
+        assembly = assembly_out.contigs
+    } else {
+        assembly = Channel.of(["runid", params.contigs])
+    }
 
     if(params.draft == null) {
-        input = Channel.of([
-            "runid": "run",
+        draft_input = assembly
+        | map { runid, contigs -> [
+            "runid": runid,
             "draft_name": params.draft_name,
-            "contigs": params.contigs,
+            "contigs": contigs,
             "reference": params.reference,
             "reads": params.reads,
             "trl_end": params.reference_terminal_repeat_left_end,
             "trr_start": params.reference_terminal_repeat_right_start
-        ])
-        draft_results = input | draft_genome
+        ]}
+        // TODO: pass on the runid!
+        draft_results = draft_input | draft_genome
         draft = draft_results.draft | map { meta, draft, basecounts -> [draft, basecounts] }
     } else {
         draft_results = null
@@ -229,3 +249,9 @@ workflow {
     )
     | output
 }
+
+
+// TODO:
+// - filter reads
+// - chose reference
+// - report + output

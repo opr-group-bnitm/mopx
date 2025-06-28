@@ -13,6 +13,5 @@ dependencies:
   - pysamstats=1.1.2
   - mafft=7.526
   - snpeff=5.2
-  - samtools=1.22
-  - bcftools=1.22
-  - sniffles=2.6.2
+  - samtools=1.21
+  - cd-hit=4.8.1
