@@ -1,7 +1,8 @@
 nextflow.enable.dsl = 2
 
-
 include {
+    concat_fastq_files;
+    filter_reads;
     canu;
     pop_canu_bubbles;
     flye;
@@ -80,14 +81,14 @@ workflow draft_genome {
         | minimap_to_separated_ref_sv
         | map {meta, draft, bam, bai -> [meta, draft, bam, bai, params.medaka_consensus_model]}
         | medaka_polish_predraft
-        | map {meta, segment -> [meta.runid, segment]}
+        | map {meta, segment -> [meta.sample, segment]}
         | groupTuple(by: 0)
         | merge_predraft
 
         predraft_with_meta = meta
-        | map {meta -> [meta.runid, meta]}
+        | map {meta -> [meta.sample, meta]}
         | join(predraft, by: 0)
-        | map {runid, meta, predraft -> [meta, predraft]}
+        | map {sampleid, meta, predraft -> [meta, predraft]}
 
         // part 2: place contigs
         raw_draft = predraft_with_meta
@@ -206,26 +207,38 @@ workflow annotate_draft {
 
 workflow {
 
+    // TODO: implement multi-sample
+    // fastqs = Channel.fromList(FastqScan.findFastqDirs(params.reads))
+    // | concat_fastq_files
+
+    fastqs = Channel.of(["sample", params.reads])
+    | concat_fastq_files
+    | map { sampleid, reads -> [sampleid, reads, params.reference]}
+    | filter_reads
+
+    // Assembly
     if(params.contigs == null ) {
-        assembly_out = Channel.of(["runid", params.reads])
+        assembly_out = fastqs
         | de_novo_assemblies
         assembly = assembly_out.contigs
     } else {
-        assembly = Channel.of(["runid", params.contigs])
+        assembly = Channel.of(["sample", params.contigs])
     }
 
+    // Consensus
     if(params.draft == null) {
         draft_input = assembly
-        | map { runid, contigs -> [
-            "runid": runid,
+        | join(fastqs, by: 0)
+        | map { sampleid, contigs, reads -> [
+            "sample": sampleid,
             "draft_name": params.draft_name,
             "contigs": contigs,
             "reference": params.reference,
-            "reads": params.reads,
+            "reads": reads,
             "trl_end": params.reference_terminal_repeat_left_end,
             "trr_start": params.reference_terminal_repeat_right_start
         ]}
-        // TODO: pass on the runid!
+        // TODO: pass on the sample-ID!
         draft_results = draft_input | draft_genome
         draft = draft_results.draft | map { meta, draft, basecounts -> [draft, basecounts] }
     } else {
@@ -233,6 +246,7 @@ workflow {
         draft = Channel.of([params.draft, params.basecounts])
     }
 
+    // Annotation
     annotation = draft
     | map { draft, basecounts -> [
         "reference": params.reference,

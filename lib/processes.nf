@@ -1,6 +1,64 @@
 nextflow.enable.dsl = 2
 
 
+process concat_fastq_files {
+    label "common"
+    cpus 1
+    input:
+        tuple val(meta), path('input_dir')
+    output:
+        tuple val(meta), path('concat.fastq')
+    """
+    set -euo pipefail
+
+    touch concat.fastq
+
+    # Check if there are any .fastq or .fastq.gz files
+    n_fastq=\$(find input_dir/ -type f \\( -name '*.fastq' -o -name '*.fq' \\) | wc -l)
+    n_fastq_gz=\$(find input_dir/ -type f \\( -name '*.fastq.gz' -o -name '*.fq.gz' \\) | wc -l)
+    total=\$(( n_fastq + n_fastq_gz ))
+
+    if [[ "\${total}" -eq 0 ]]
+    then
+        echo "ERROR: No .fastq or .fastq.gz files found" >&2
+        exit 1
+    fi
+
+    # Concatenate uncompressed .fastq files
+    find input_dir/ -type f \\( -name '*.fastq' -o -name '*.fq' \\) | while read -r fq
+    do
+        cat "\${fq}" >> concat.fastq
+    done
+
+    # Concatenate compressed .fastq.gz files
+    find input_dir/ -type f \\( -name '*.fastq.gz' -o -name '*.fq.gz' \\) | while read -r fqz
+    do
+        gzip -dc "\${fqz}" >> concat.fastq
+    done
+    """
+}
+
+
+process filter_reads {
+    label "common"
+    cpus 4
+    input:
+        tuple val(meta), path('reads.fastq'), path('ref.fasta')
+    output:
+        tuple val(meta), path('filtered.fastq')
+    """
+    minimap2 \\
+        -ax map-ont \\
+        --secondary=no \\
+        ref.fasta \\
+        -t ${task.cpus} \\
+        reads.fastq \\
+    | samtools fastq \\
+        -F 4 > filtered.fastq
+    """
+}
+
+
 process canu {
     label "canu"
     cpus 16
