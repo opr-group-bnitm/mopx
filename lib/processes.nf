@@ -9,34 +9,29 @@ process concat_fastq_files {
     output:
         tuple val(meta), path('concat.fastq')
     """
-    set -euo pipefail
+    #!/usr/bin/env python3
 
-    touch concat.fastq
+    from pathlib import Path
+    import gzip
 
-    # Check if there are any .fastq or .fastq.gz files
-    n_fastq=\$(find input_dir/ -type f \\( -name '*.fastq' -o -name '*.fq' \\) | wc -l)
-    n_fastq_gz=\$(find input_dir/ -type f \\( -name '*.fastq.gz' -o -name '*.fq.gz' \\) | wc -l)
-    total=\$(( n_fastq + n_fastq_gz ))
+    fcount = 0
 
-    if [[ "\${total}" -eq 0 ]]
-    then
-        echo "ERROR: No .fastq or .fastq.gz files found" >&2
-        exit 1
-    fi
+    with open('concat.fastq', 'w') as f_out:
+        for fname in Path('input_dir').iterdir():
+            if fname.name.endswith('.fq') or fname.name.endswith('.fastq'):
+                fcount += 1
+                with open(fname) as f:
+                    f_out.write(f.read())
+            elif fname.name.endswith('.fq.gz') or fname.name.endswith('.fastq.gz'):
+                fcount += 1
+                with gzip.open(fname, 'rt') as f:
+                    f_out.write(f.read())
 
-    # Concatenate uncompressed .fastq files
-    find input_dir/ -type f \\( -name '*.fastq' -o -name '*.fq' \\) | while read -r fq
-    do
-        cat "\${fq}" >> concat.fastq
-    done
-
-    # Concatenate compressed .fastq.gz files
-    find input_dir/ -type f \\( -name '*.fastq.gz' -o -name '*.fq.gz' \\) | while read -r fqz
-    do
-        gzip -dc "\${fqz}" >> concat.fastq
-    done
+    if fcount == 0:
+        raise RuntimeError('No fastq files found!')
     """
 }
+
 
 
 process filter_reads {

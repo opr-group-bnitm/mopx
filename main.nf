@@ -266,6 +266,5 @@ workflow {
 
 
 // TODO:
-// - filter reads
 // - chose reference
 // - report + output
