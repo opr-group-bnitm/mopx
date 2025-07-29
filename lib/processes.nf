@@ -33,7 +33,6 @@ process concat_fastq_files {
 }
 
 
-
 process filter_reads {
     label "common"
     cpus 4
