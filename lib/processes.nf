@@ -63,7 +63,9 @@ process canu {
     output:
         tuple val(meta), path('canu_contigs.fasta')
     """
-    canu \\
+    set -e
+
+    if canu \\
         -nanopore-raw ${reads} \\
         -p asm \\
         -d out \\
@@ -73,9 +75,14 @@ process canu {
         stopOnLowCoverage=${params.canu_stop_on_low_coverage} \\
         maxThreads=${task.cpus} \\
         minInputCoverage=${params.canu_min_input_coverage} \\
-        maxMemory=${task.memory.toGiga()}g
+        maxMemory=${task.memory.toGiga()}g; then
 
-    mv out/asm.contigs.fasta canu_contigs.fasta
+        mv out/asm.contigs.fasta canu_contigs.fasta
+
+    else
+        echo "Canu failed; creating empty contigs file."
+        touch canu_contigs.fasta
+    fi
     """
 }
 
