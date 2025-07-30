@@ -4,28 +4,10 @@ import argparse
 import os
 from collections import Counter
 import pandas as pd
-
 import pysam
-import pysamstats
-
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-
-
-def get_basecounts_pysamstats(fname_bam, fname_ref):
-    return [
-        {
-            "position": record["pos"],
-            "A": record["A"],
-            "C": record["C"],
-            "G": record["G"],
-            "T": record["T"],
-            "deletions": record["deletions"],
-            "reads_all": record["reads_all"]
-        }
-        for record in pysamstats.stat_variation(pysam.AlignmentFile(fname_bam, "rb"), fafile=fname_ref)
-    ]
 
 
 def oriented_seq(seq: str, forward: bool) -> str:

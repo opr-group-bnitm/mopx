@@ -207,6 +207,115 @@ process minimap_eqx {
 }
 
 
+process assign_terminal_hairpin_region {
+    label "common"
+    input:
+        tuple val(meta), path("polished_draft.fasta"), path("hairpin.fasta")
+    output:
+        tuple val(meta), path("hairpin_region_to_refine.fasta"), path("hairpin_matching.json")
+    """
+    match_terminal_hairpin.py \\
+        --hairpin hairpin.fasta \\
+        --genome polished_draft.fasta \\
+        --margin 300 \\
+        --flanking_region_diff_tolerance 50 \\
+        --out .
+    """
+}
+
+
+process minimap_nosecondary {
+    label "common"
+    cpus 2
+    input:
+        tuple val(meta), path(ref), path(reads)
+    output:
+        tuple val(meta), path(ref), path('sorted.bam'), path('sorted.bam.bai')
+    """
+    minimap2 -Y -ax map-ont $ref $reads --secondary=no \
+    | samtools view -b -o mapped.bam
+    samtools sort -o sorted.bam mapped.bam
+    samtools index sorted.bam
+    """
+}
+
+
+process medaka_variants {
+    label "medaka"
+    cpus 2
+    input:
+        tuple val(meta),
+            path("draft.fasta"),
+            path("mapped.bam"),
+            path("mapped.bam.bai"),
+            path(model)
+    output:
+        tuple val(meta), path("annotated.vcf")
+    """
+    if [[ -s "draft.fasta" ]]
+    then
+        medaka inference mapped.bam consensus_probs.hdf --model "$model" --threads $task.cpus
+
+        medaka vcf consensus_probs.hdf draft.fasta variants.vcf --gvcf
+
+        bcftools sort variants.vcf -o sorted.vcf
+
+        medaka tools annotate sorted.vcf draft.fasta mapped.bam annotated.vcf
+    else
+        touch annotated.vcf
+    fi
+    """
+}
+
+
+process make_hairpin_consensus {
+    label "common"
+    input:
+        tuple val(meta),
+            path("hairpin_matching.json"),
+            path("variants.vcf")
+    output:
+        tuple val(meta),
+            path("hairpin_consensus.fasta")
+    """
+    if [[ -s "variants.vcf" ]]
+    then
+        build_refined_terminal_hairpin.py \\
+            --hairpin-matches hairpin_matching.json \\
+            --gvcf variants.vcf \\
+            --min-depth ${params.min_coverage} \\
+            --min-qual ${params.medaka_variant_minqual} \\
+            --out hairpin_consensus.fasta
+    fi
+    touch hairpin_consensus.fasta
+    """
+}
+
+
+process integrate_fixed_hairpin {
+    label "common"
+    input:
+        tuple val(meta),
+            path("corrected_draft.fasta"),
+            path("hairpin_matching.json"),
+            path("hairpin_consensus.fasta")
+    output:
+        tuple val(meta), path("fixed_hairpin_draft.fasta") 
+    """
+    if [[ -s hairpin_consensus.fasta ]]
+    then
+        integrate_fixed_hairpin.py \\
+            --draft corrected_draft.fasta \\
+            --hairpin-consensus hairpin_consensus.fasta \\
+            --hairpin-matches hairpin_matching.json \\
+            --out fixed_hairpin_draft.fasta
+    else
+        cp corrected_draft.fasta fixed_hairpin_draft.fasta
+    fi
+    """
+}
+
+
 process sniffles {
     label "structural_variants"
     cpus 2
@@ -422,7 +531,7 @@ process correct_and_mask_consensus {
     label "common"
     cpus 1
     input:
-        tuple val(meta), path('draft.fasta'), path('sorted.bam'), path('sorted.bam.bai')
+        tuple val(meta), path("draft.fasta"), path("sorted.bam"), path("sorted.bam.bai")
     output:
         tuple val(meta), path("consensus_masked.fasta"), path("nucleotide_counts.tsv")
     """
@@ -447,6 +556,21 @@ process evaluate_contigs {
     """
 }
 
+
+process gb2fasta {
+    label "common"
+    cpus 1
+    input:
+        tuple val(meta), path("reference.gb")
+    output:
+        tuple val(meta), path("reference.fasta")
+    """
+    #!/usr/bin/env python3
+    from Bio import SeqIO
+    gb = SeqIO.parse('reference.gb', 'genbank')
+    SeqIO.write(gb, 'reference.fasta', 'fasta')
+    """
+}
 
 process mafft_align {
     label "common"
@@ -518,19 +642,6 @@ process annotate_cds_changes {
 }
 
 
-process mutational_spectrum {
-    label "common"
-    cpus 1
-    input:
-        tuple val(meta), path("ref.fasta"), path("variants.vcf.gz"), path("variants.vcf.gz.tbi")
-    output:
-        tuple val(meta), path("pairs.tsv"), path("triples.tsv")
-    """
-    mutational_spectrum.py --vcf variants.vcf.gz --ref ref.fasta  --out .
-    """
-}
-
-
 process annotate_aa_changes {
     label "common"
     cpus 1
@@ -556,17 +667,17 @@ process annotate_aa_changes {
         exit 1
     fi
 
-    snpEff build \
-        -configOption "\${ref_id}.genome=\${ref_id}" \
-        -dataDir \$PWD/data \
-        -genbank -v \
+    snpEff build \\
+        -configOption "\${ref_id}.genome=\${ref_id}" \\
+        -dataDir \$PWD/data \\
+        -genbank -v \\
         \${ref_id}
 
-    snpEff \
-        -configOption "\${ref_id}.genome=\${ref_id}" \
-        -dataDir \$PWD/data \
-        -v -no-downstream -no-upstream -no-utr \
-        \${ref_id} \
+    snpEff \\
+        -configOption "\${ref_id}.genome=\${ref_id}" \\
+        -dataDir \$PWD/data \\
+        -v -no-downstream -no-upstream -no-utr \\
+        \${ref_id} \\
         variants.vcf.gz > annotated.vcf
 
     bgzip annotated.vcf

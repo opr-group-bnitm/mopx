@@ -25,13 +25,18 @@ include {
     medaka_polish;
     correct_and_mask_consensus;
     evaluate_contigs;
+    assign_terminal_hairpin_region;
+    minimap_nosecondary;
+    medaka_variants;
+    make_hairpin_consensus;
+    integrate_fixed_hairpin;
     // annotation
+    gb2fasta;
     mafft_align;
     shift_gaps;
     variants_from_alignment;
     variants_report;
     annotate_cds_changes;
-    mutational_spectrum;
     annotate_aa_changes;
     // general
     output
@@ -111,6 +116,33 @@ workflow draft_genome {
 
         corrected_draft = alignments_reads_to_polished
         | correct_and_mask_consensus
+ 
+        // refine and integracte the hairpin
+
+        hairpin_match = polished_draft
+        | map { meta, polished -> [meta, polished, params.hairpin]}
+        | assign_terminal_hairpin_region
+
+        hairpin_alignments = hairpin_match
+        | map { meta, hp_ref, hp_match -> [meta + [hairpin_match_info: hp_match], hp_ref, meta.reads]}
+        | minimap_nosecondary
+
+        hairpin_variants = hairpin_alignments
+        | map { meta, ref, bam, bai -> [meta, ref, bam, bai, params.medaka_consensus_model] }
+        | medaka_variants
+
+        hairpin_consensus = hairpin_variants
+        | map { meta, vcf -> [meta, meta.hairpin_match_info, vcf] }
+        | make_hairpin_consensus
+
+        draft_by_sample = corrected_draft
+        | map { meta, draft, counts -> [meta.sample, draft] }
+
+        draft_with_corrected_hairpin = hairpin_consensus
+        | map { meta, hp_cons -> [meta.sample, meta, hp_cons] }
+        | join(draft_by_sample, by: 0)
+        | map { sampleid, meta, hp_cons, draft -> [meta, draft, meta.hairpin_match_info, hp_cons] }
+        | integrate_fixed_hairpin
 
         // Alignments for troubleshooting/further analysis
         // 1 - map contigs to polished draft
@@ -139,6 +171,7 @@ workflow draft_genome {
             tr_annotated_draft | map {meta, draft, alignment, tr_range -> [alignment, 'repeat_transfer', 'alignment.fasta']},
             tr_annotated_draft | map {meta, draft, alignment, tr_range -> [alignment, 'repeat_transfer', 'range.txt']},
             polished_draft | map {meta, draft -> [draft, 'draft', 'polished.fasta']},
+            draft_with_corrected_hairpin | map {meta, draft -> [draft, 'draft', 'corrected_hairpin.fasta']},
             alignments_reads_to_polished | map {meta, draft, bam, bai -> [bam, 'alignments', 'reads_vs_polished.bam']},
             alignments_reads_to_polished | map {meta, draft, bam, bai -> [bai, 'alignments', 'reads_vs_polished.bam.bai']},
             corrected_draft | map {meta, draft, table -> [draft, 'draft', 'corrected.fasta']},
@@ -162,8 +195,11 @@ workflow annotate_draft {
     take:
         draft_ref
     main:
+
         alignment = draft_ref
-        | map {meta -> [meta, [meta.reference, meta.draft]]}
+        | map {meta -> [meta, meta.genbank]}
+        | gb2fasta
+        | map {meta, ref_fasta -> [meta, [ref_fasta, meta.draft]]}
         | mafft_align
         | shift_gaps
 
@@ -171,6 +207,9 @@ workflow annotate_draft {
         | map {meta, alignment -> [meta, alignment, meta.basecounts]}
         | variants_from_alignment
 
+        // TODO: remove variants_report? and aa_report?
+        // - replace with annotation based on ORF to AA alignments as done for
+        //   the genome annotations? 
         variant_report = variants
         | map {meta, vcf, tbi -> [meta, meta.genbank, vcf, tbi]}
         | variants_report
@@ -183,10 +222,6 @@ workflow annotate_draft {
         | map {meta, vcf, tbi -> [meta, meta.genbank, vcf, tbi]}
         | annotate_aa_changes
 
-        mut_spec = variants
-        | map {meta, vcf, tbi -> [meta, meta.reference, vcf, tbi]}
-        | mutational_spectrum
-
         write_this = Channel.empty()
         | mix(
             alignment | map {meta, align -> [align, 'annotation', 'alignment.fasta']},
@@ -196,9 +231,7 @@ workflow annotate_draft {
             vcf_variants | map {meta, vcf, tbi, genetable, var_summary -> [genetable, 'annotation', 'gene_variant_summary.txt']},
             vcf_variants | map {meta, vcf, tbi, genetable, var_summary -> [var_summary, 'annotation', 'variant_summary.html']},
             aa_report | map {meta, aa_align, transfers -> [aa_align, 'annotation', 'protein_alignments.txt']},
-            aa_report | map {meta, aa_align, transfers -> [transfers, 'annotation', 'cds_transfer.tsv']},
-            mut_spec | map {meta, pairs, triples -> [pairs, 'annotation', 'mut_pairs.tsv']},
-            mut_spec | map {meta, pairs, triples -> [triples, 'annotation', 'mut_triples.tsv']}
+            aa_report | map {meta, aa_align, transfers -> [transfers, 'annotation', 'cds_transfer.tsv']}
         )
     emit:
         write_this = write_this
@@ -249,7 +282,6 @@ workflow {
     // Annotation
     annotation = draft
     | map { draft, basecounts -> [
-        "reference": params.reference,
         "draft": draft,
         "genbank": params.reference_genbank,
         "basecounts": basecounts
