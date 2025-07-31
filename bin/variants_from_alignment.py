@@ -125,7 +125,7 @@ def write_vcf(variants, basecounts, fname, reference_id):
             )
             pos_query = pos + sum_ins - sum_del
             sum_del += len(ref)
-            sum_ins += len(alt)            
+            sum_ins += len(alt)
             # Add base count info if it's a SNP
             if len(ref) == len(alt) == 1 and pos_query in basecounts.index:
                 counts = basecounts.loc[pos_query]

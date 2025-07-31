@@ -2,6 +2,8 @@
 
 import argparse
 import json
+import os
+import pandas as pd
 
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
@@ -11,6 +13,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--draft',
+        required=True,
+        help=''
+    )
+    parser.add_argument(
+        '--basecounts',
         required=True,
         help=''
     )
@@ -27,9 +34,14 @@ def main():
     parser.add_argument(
         '--out',
         required=True,
-        help='Fasta filename for corrected draft.'
+        help='Output directory'
     )
     args = parser.parse_args()
+
+    os.makedirs(args.out, exist_ok=True)
+
+    fname_seq_out = os.path.join(args.out, 'fixed_hairpin_draft.fasta')
+    fname_basecounts_out = os.path.join(args.out, 'fixed_hairpin_basecounts.tsv')
 
     with open(args.hairpin_matches) as f:
         match_details =  json.load(f)
@@ -49,9 +61,17 @@ def main():
             name=draft.name,
             seq=outseq
         ),
-        args.out,
+        fname_seq_out,
         'fasta'
     )
+
+    basecounts = pd.read_csv(args.basecounts, sep='\t')
+
+    shift_pos = len(arm_1.seq) - len_left
+    basecounts['position'] += shift_pos
+    basecounts = basecounts[len_left:-len_right]
+
+    basecounts.to_csv(fname_basecounts_out, sep='\t', index=False)
 
 
 if __name__ == '__main__':

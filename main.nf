@@ -136,12 +136,12 @@ workflow draft_genome {
         | make_hairpin_consensus
 
         draft_by_sample = corrected_draft
-        | map { meta, draft, counts -> [meta.sample, draft] }
+        | map { meta, draft, basecounts -> [meta.sample, draft, basecounts] }
 
         draft_with_corrected_hairpin = hairpin_consensus
         | map { meta, hp_cons -> [meta.sample, meta, hp_cons] }
         | join(draft_by_sample, by: 0)
-        | map { sampleid, meta, hp_cons, draft -> [meta, draft, meta.hairpin_match_info, hp_cons] }
+        | map { sampleid, meta, hp_cons, draft, basecounts -> [meta, draft, basecounts, meta.hairpin_match_info, hp_cons] }
         | integrate_fixed_hairpin
 
         // Alignments for troubleshooting/further analysis
@@ -171,11 +171,10 @@ workflow draft_genome {
             tr_annotated_draft | map {meta, draft, alignment, tr_range -> [alignment, 'repeat_transfer', 'alignment.fasta']},
             tr_annotated_draft | map {meta, draft, alignment, tr_range -> [alignment, 'repeat_transfer', 'range.txt']},
             polished_draft | map {meta, draft -> [draft, 'draft', 'polished.fasta']},
-            draft_with_corrected_hairpin | map {meta, draft -> [draft, 'draft', 'corrected_hairpin.fasta']},
+            draft_with_corrected_hairpin | map {meta, draft, basecounts -> [draft, 'draft', 'draft_final.fasta']},
+            draft_with_corrected_hairpin | map {meta, draft, basecounts -> [basecounts, 'draft', 'basecounts_final.tsv']},
             alignments_reads_to_polished | map {meta, draft, bam, bai -> [bam, 'alignments', 'reads_vs_polished.bam']},
             alignments_reads_to_polished | map {meta, draft, bam, bai -> [bai, 'alignments', 'reads_vs_polished.bam.bai']},
-            corrected_draft | map {meta, draft, table -> [draft, 'draft', 'corrected.fasta']},
-            corrected_draft | map {meta, draft, table -> [table, 'draft', 'corrected_basecounts.tsv']},
             contigs_mapped_to_polished | map {meta, draft, bam, bai -> [bam, 'alignments', 'contigs_vs_polished.bam']},
             contigs_mapped_to_polished | map {meta, draft, bam, bai -> [bai, 'alignments', 'contigs_vs_polished.bam.bai']},
             contigs_mapped_to_ref | map {meta, draft, bam, bai -> [bam, 'alignments', 'contigs_vs_ref.bam']},
@@ -186,7 +185,7 @@ workflow draft_genome {
         )
     emit:
         // emit everything that is used next
-        draft = corrected_draft
+        draft = draft_with_corrected_hairpin
         write_this = write_this
 }
 
@@ -276,7 +275,7 @@ workflow {
         draft = draft_results.draft | map { meta, draft, basecounts -> [draft, basecounts] }
     } else {
         draft_results = null
-        draft = Channel.of([params.draft, params.basecounts])
+        draft = Channel.of(params.draft)
     }
 
     // Annotation

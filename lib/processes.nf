@@ -297,20 +297,23 @@ process integrate_fixed_hairpin {
     input:
         tuple val(meta),
             path("corrected_draft.fasta"),
+            path("basecounts.tsv"),
             path("hairpin_matching.json"),
             path("hairpin_consensus.fasta")
     output:
-        tuple val(meta), path("fixed_hairpin_draft.fasta") 
+        tuple val(meta), path("fixed_hairpin_draft.fasta"), path("fixed_hairpin_basecounts.tsv") 
     """
     if [[ -s hairpin_consensus.fasta ]]
     then
         integrate_fixed_hairpin.py \\
             --draft corrected_draft.fasta \\
+            --basecounts basecounts.tsv \\
             --hairpin-consensus hairpin_consensus.fasta \\
             --hairpin-matches hairpin_matching.json \\
-            --out fixed_hairpin_draft.fasta
+            --out .
     else
         cp corrected_draft.fasta fixed_hairpin_draft.fasta
+        cp basecounts.tsv fixed_hairpin_basecounts.tsv
     fi
     """
 }
