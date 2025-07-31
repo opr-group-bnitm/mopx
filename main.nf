@@ -50,7 +50,7 @@ workflow de_novo_assemblies {
         canu_assemblies = reads
         | canu
         | pop_canu_bubbles
-    
+
         flye_assemblies = reads
         | flye
 
