@@ -44,7 +44,7 @@ def main():
     fname_basecounts_out = os.path.join(args.out, 'fixed_hairpin_basecounts.tsv')
 
     with open(args.hairpin_matches) as f:
-        match_details =  json.load(f)
+        match_details = json.load(f)
 
     arm_1 = next(SeqIO.parse(args.hairpin_consensus, 'fasta'))
     draft = SeqIO.read(args.draft, 'fasta')

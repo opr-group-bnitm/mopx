@@ -173,6 +173,7 @@ workflow draft_genome {
             polished_draft | map {meta, draft -> [draft, 'draft', 'polished.fasta']},
             draft_with_corrected_hairpin | map {meta, draft, basecounts -> [draft, 'draft', 'draft_final.fasta']},
             draft_with_corrected_hairpin | map {meta, draft, basecounts -> [basecounts, 'draft', 'basecounts_final.tsv']},
+            hairpin_consensus | map {meta, hp_cons -> [hp_cons, 'draft', 'terminal_hairpin.fasta']},
             alignments_reads_to_polished | map {meta, draft, bam, bai -> [bam, 'alignments', 'reads_vs_polished.bam']},
             alignments_reads_to_polished | map {meta, draft, bam, bai -> [bai, 'alignments', 'reads_vs_polished.bam.bai']},
             contigs_mapped_to_polished | map {meta, draft, bam, bai -> [bam, 'alignments', 'contigs_vs_polished.bam']},

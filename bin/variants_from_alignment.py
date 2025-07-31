@@ -109,10 +109,6 @@ def write_vcf(variants, basecounts, fname, reference_id):
         + ' | '.join(BASECOUNT_COLS)
         + '">'
     )
-    # header.add_meta(
-    #     key='FORMAT',
-    #     items=[('ID', 'GT'), ('Number', '1'), ('Type', 'String'), ('Description', 'Genotype')]
-    # )
     sum_ins = 0
     sum_del = 0
     with pysam.VariantFile(fname, 'w', header=header) as vcf_out:        
