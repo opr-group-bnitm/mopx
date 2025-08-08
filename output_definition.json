@@ -1,0 +1,20 @@
+{
+  "files": {
+    "workflow-report": {
+      "filepath": "./report.html",
+      "title": "Workflow report",
+      "description": "The report for the workflow",
+      "mime-type": "text/html",
+      "optional": true,
+      "type": "aggregated"
+    },
+    "denovo-consensus-fasta" : {
+      "filepath": "./draft/basecounts_final.tsv",
+      "title": "Basecounts",
+      "description": "Basecounts per position in the output draft.",
+      "mime-type": "text/tsv",
+      "optional": true,
+      "type": "aggregated"
+    }
+  }
+}

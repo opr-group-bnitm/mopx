@@ -71,7 +71,7 @@ workflow draft_genome {
 
         // part 1: build pre-draft
         ref_split = meta
-        | map {meta -> [meta, params.reference_terminal_repeat_left_end, meta.reference]}
+        | map {meta -> [meta, meta.trl_end, meta.reference]}
         | split_ref
 
         refs_in_pieces = ref_split.itr
@@ -120,7 +120,7 @@ workflow draft_genome {
         // refine and integracte the hairpin
 
         hairpin_match = polished_draft
-        | map { meta, polished -> [meta, polished, params.hairpin]}
+        | map { meta, polished -> [meta, polished, meta.hairpin]}
         | assign_terminal_hairpin_region
 
         hairpin_alignments = hairpin_match
@@ -166,8 +166,8 @@ workflow draft_genome {
 
         write_this = Channel.empty()
         | mix(
-            raw_draft | map {meta, draft, log -> [draft, 'draft', 'draft.fasta']},
-            raw_draft | map {meta, draft, log -> [log, 'logs', 'draft.log']},
+            raw_draft | map {meta, draft, log -> [draft, 'draft', 'raw_draft.fasta']},
+            raw_draft | map {meta, draft, log -> [log, 'logs', 'raw_draft.log']},
             tr_annotated_draft | map {meta, draft, alignment, tr_range -> [alignment, 'repeat_transfer', 'alignment.fasta']},
             tr_annotated_draft | map {meta, draft, alignment, tr_range -> [alignment, 'repeat_transfer', 'range.txt']},
             polished_draft | map {meta, draft -> [draft, 'draft', 'polished.fasta']},
@@ -195,7 +195,6 @@ workflow annotate_draft {
     take:
         draft_ref
     main:
-
         alignment = draft_ref
         | map {meta -> [meta, meta.genbank]}
         | gb2fasta
@@ -238,11 +237,21 @@ workflow annotate_draft {
 }
 
 
+if (params.overwrite_medaka) {
+    params.medaka_consensus_model = params.overwrite_medaka
+}
+
 workflow {
+
+    // TODO: add option for custom reference
+    ref = params.reference_dict[params.reference]
+    reference_fasta = projectDir.resolve("./data/references/${ref.fasta}")
+    reference_genbank = projectDir.resolve("./data/references/${ref.genbank}")
+    hairpin_fasta = projectDir.resolve("./data/references/${ref.hairpin}")
 
     fastqs = Channel.of(["sample", params.reads])
     | concat_fastq_files
-    | map { sampleid, reads -> [sampleid, reads, params.reference]}
+    | map { sampleid, reads -> [sampleid, reads, reference_fasta]}
     | filter_reads
 
     // Assembly
@@ -259,13 +268,14 @@ workflow {
         draft_input = assembly
         | join(fastqs, by: 0)
         | map { sampleid, contigs, reads -> [
-            "sample": sampleid,
-            "draft_name": params.draft_name,
-            "contigs": contigs,
-            "reference": params.reference,
-            "reads": reads,
-            "trl_end": params.reference_terminal_repeat_left_end,
-            "trr_start": params.reference_terminal_repeat_right_start
+            sample: sampleid,
+            draft_name: params.draft_name,
+            contigs: contigs,
+            reference: reference_fasta,
+            reads: reads,
+            trl_end: ref.reference_terminal_repeat_left_end,
+            trr_start: ref.reference_terminal_repeat_right_start,
+            hairpin: hairpin_fasta
         ]}
         // TODO: pass on the sample-ID!
         draft_results = draft_input | draft_genome
@@ -279,7 +289,7 @@ workflow {
     annotation = draft
     | map { draft, basecounts -> [
         "draft": draft,
-        "genbank": params.reference_genbank,
+        "genbank": reference_genbank,
         "basecounts": basecounts
     ] }
     | annotate_draft

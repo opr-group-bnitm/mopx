@@ -1,0 +1,154 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "https://raw.githubusercontent.com/OPR-group-BNITM/mopx/nextflow_schema.json",
+  "title": "OPR-group-BNITM/mopx",
+  "workflow_title": "MOPX: Metagenomics Orthopoxvirus Pipeline X",
+  "description": "Genome reconstruction pipeline for Orthopoxvirus from nanopore metagenomics data.",
+  "demo_url": "",
+  "url": "https://github.com/OPR-group-BNITM/mopx",
+  "type": "object",
+  "resources": {
+    "recommended": {
+      "cpus": 16,
+      "memory": "30 GB"
+    },
+    "minimum": {
+      "cpus": 16,
+      "memory": "30 GB"
+    },
+    "run_time": "5 to 15 minutes",
+    "arm_support": false
+  },
+  "definitions": {
+    "input": {
+      "title": "Input Options",
+      "type": "object",
+      "description": "",
+      "default": "",
+      "properties": {
+        "reads": {
+          "type": "string",
+          "description": "Path to input FASTQ files directory, only one barcode passible at the moment.",
+          "format": "path",
+          "help_text": "Directory containing FASTQ files, e.g., 'HAM-2025-RUN001/barcode01'"
+        },
+        "reference": {
+            "type": "string",
+            "title": "Reference genome",
+            "description": "Choose a reference that fits to your data.",
+            "help_text": "",
+            "enum": [
+                "cladeIIb",
+                "cladeIIb_GIN_G1"
+            ]
+        },
+        "overwrite_medaka": {
+          "title": "Medaka model",
+          "type": "string",
+          "default": "output",
+          "format": "path",
+          "description": "Medaka model for variant calling and consensus creation.",
+          "help_text": "Leave empty to use default (r1041_e82_400bps_hac_v4.1.0_model_pt.tar.gz)."
+        }
+      }
+    },
+    "output": {
+      "title": "Output Options",
+      "type": "object",
+      "fa_icon": "fas fa-arrow-left",
+      "description": "Parameters for saving and naming outputs",
+      "properties": {
+        "out_dir": {
+            "title": "Output directory",
+            "type": "string",
+            "default": "output",
+            "format": "path",
+            "description": "Output directory, should be the RUN directory where the subdirectory with the output for each sample is created",
+            "help_text": "Directory where the final results and reports will be saved. Can be absolute or relative path."
+          },
+          "draft_name": {
+            "title": "Draft name",
+            "type": "string",
+            "default": "draft",
+            "description": "Name of the output genome.",
+            "help_text": ""
+          }
+      }
+    },
+    "advanced": {
+      "title": "Advanced Options",
+      "type": "object",
+      "fa_icon": "fas fa-arrow-left",
+      "description": "Advanced pipeline parameters",
+      "properties": {
+          "min_coverage": {
+            "title": "Minimum coverage",
+            "type": "integer",
+            "default": 20,
+            "description": "Minimum coverage to call a base (e.g. 20x).",
+            "help_text": ""
+          }
+        }
+    },
+    "misc": {
+      "title": "Miscellaneous Options",
+      "type": "object",
+      "description": "Everything else.",
+      "default": "",
+      "properties": {
+        "cleanup": {
+          "type": "boolean",
+          "default": true,
+          "hidden": true
+        },
+        "reference_dict": {
+          "type": "object",
+          "hidden": true
+        },
+        "medaka_consensus_model" {
+          "type": "string",
+          "hidden": true
+        },
+        "schema": {
+          "type": "string",
+          "default": "./nextflow_schema.json",
+          "hidden": true
+        },
+        "monochrome_logs": {
+          "type": "boolean",
+          "default": false,
+          "hidden": true
+        },
+        "validate_params": {
+          "type": "boolean",
+          "default": true,
+          "hidden": true
+        },
+        "version": {
+          "type": "boolean",
+          "default": false,
+          "hidden": true
+        },
+        "help": {
+          "type": "boolean",
+          "default": false,
+          "hidden": true
+        },
+        "aws_image_prefix": {
+          "type": "string",
+          "hidden": true
+        },
+        "aws_queue": {
+          "type": "string",
+          "hidden": true
+        }
+      }
+    }
+  },
+  "allOf": [
+    { "$ref": "#/definitions/input" },
+    { "$ref": "#/definitions/output" },
+    { "$ref": "#/definitions/advanced" },
+    { "$ref": "#/definitions/misc" }
+  ]
+}
