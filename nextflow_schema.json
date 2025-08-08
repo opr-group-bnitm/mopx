@@ -30,7 +30,8 @@
           "type": "string",
           "description": "Path to input FASTQ files directory, only one barcode passible at the moment.",
           "format": "path",
-          "help_text": "Directory containing FASTQ files, e.g., 'HAM-2025-RUN001/barcode01'"
+          "help_text": "Directory containing FASTQ files, e.g., 'HAM-2025-RUN001/barcode01'",
+          "fa_icon": "far fa-folder"
         },
         "reference": {
             "type": "string",
@@ -40,7 +41,8 @@
             "enum": [
                 "cladeIIb",
                 "cladeIIb_GIN_G1"
-            ]
+            ],
+            "fa_icon": "far fa-folder"
         },
         "overwrite_medaka": {
           "title": "Medaka model",
@@ -48,7 +50,8 @@
           "default": "output",
           "format": "path",
           "description": "Medaka model for variant calling and consensus creation.",
-          "help_text": "Leave empty to use default (r1041_e82_400bps_hac_v4.1.0_model_pt.tar.gz)."
+          "help_text": "Leave empty to use default (r1041_e82_400bps_hac_v4.1.0_model_pt.tar.gz).",
+          "fa_icon": "far fa-folder"
         }
       }
     },
@@ -64,14 +67,16 @@
             "default": "output",
             "format": "path",
             "description": "Output directory, should be the RUN directory where the subdirectory with the output for each sample is created",
-            "help_text": "Directory where the final results and reports will be saved. Can be absolute or relative path."
+            "help_text": "Directory where the final results and reports will be saved. Can be absolute or relative path.",
+            "fa_icon": "far fa-folder"
           },
           "draft_name": {
             "title": "Draft name",
             "type": "string",
             "default": "draft",
             "description": "Name of the output genome.",
-            "help_text": ""
+            "help_text": "",
+            "fa_icon": "far fa-folder"
           }
       }
     },
@@ -86,7 +91,8 @@
             "type": "integer",
             "default": 20,
             "description": "Minimum coverage to call a base (e.g. 20x).",
-            "help_text": ""
+            "help_text": "",
+            "fa_icon": "far fa-folder"
           }
         }
     },
