@@ -84,7 +84,7 @@ workflow draft_genome {
         | structural_variant_consensus
         | map {meta, sv_consensus -> [meta, sv_consensus, meta.reads]}
         | minimap_to_separated_ref_sv
-        | map {meta, draft, bam, bai -> [meta, draft, bam, bai, params.medaka_consensus_model]}
+        | map {meta, draft, bam, bai -> [meta, draft, bam, bai, meta.medaka_model]}
         | medaka_polish_predraft
         | map {meta, segment -> [meta.sample, segment]}
         | groupTuple(by: 0)
@@ -107,7 +107,7 @@ workflow draft_genome {
         polished_draft = tr_annotated_draft
         | map {meta, draft, alignment, tr_range -> [meta, draft, meta.reads, tr_range]}
         | align_with_terminal_repeats
-        | map {meta, draft, bam, bai -> [meta, draft, bam, bai, params.medaka_consensus_model]}
+        | map {meta, draft, bam, bai -> [meta, draft, bam, bai, meta.medaka_model]}
         | medaka_polish
 
         alignments_reads_to_polished = polished_draft 
@@ -128,7 +128,7 @@ workflow draft_genome {
         | minimap_nosecondary
 
         hairpin_variants = hairpin_alignments
-        | map { meta, ref, bam, bai -> [meta, ref, bam, bai, params.medaka_consensus_model] }
+        | map { meta, ref, bam, bai -> [meta, ref, bam, bai, meta.medaka_model] }
         | medaka_variants
 
         hairpin_consensus = hairpin_variants
@@ -237,10 +237,6 @@ workflow annotate_draft {
 }
 
 
-if (!params.medaka_consensus_model) {
-    params.medaka_consensus_model = "${workflow.projectDir}/${params.medaka_consensus_model_default}"
-}
-
 workflow {
 
     // TODO: add option for custom reference
@@ -248,6 +244,12 @@ workflow {
     reference_fasta = projectDir.resolve("./data/references/${ref.fasta}")
     reference_genbank = projectDir.resolve("./data/references/${ref.genbank}")
     hairpin_fasta = projectDir.resolve("./data/references/${ref.hairpin}")
+
+    if(params.medaka_consensus_model) {
+        medaka_model = params.medaka_consensus_model
+    } else {
+        medaka_model = projectDir.resolve("./data/${params.medaka_consensus_model_default}")
+    }
 
     fastqs = Channel.of(["sample", params.reads])
     | concat_fastq_files
@@ -275,7 +277,8 @@ workflow {
             reads: reads,
             trl_end: ref.reference_terminal_repeat_left_end,
             trr_start: ref.reference_terminal_repeat_right_start,
-            hairpin: hairpin_fasta
+            hairpin: hairpin_fasta,
+            medaka_model: medaka_model
         ]}
         // TODO: pass on the sample-ID!
         draft_results = draft_input | draft_genome

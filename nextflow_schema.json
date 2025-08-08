@@ -39,6 +39,7 @@
             "description": "Choose a reference that fits to your data.",
             "help_text": "",
             "enum": [
+                "cladeIIa_GIN",
                 "cladeIIb",
                 "cladeIIb_GIN_G1"
             ],
