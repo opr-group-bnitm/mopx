@@ -240,10 +240,6 @@ workflow annotate_draft {
 
 workflow {
 
-    // TODO: implement multi-sample
-    // fastqs = Channel.fromList(FastqScan.findFastqDirs(params.reads))
-    // | concat_fastq_files
-
     fastqs = Channel.of(["sample", params.reads])
     | concat_fastq_files
     | map { sampleid, reads -> [sampleid, reads, params.reference]}
