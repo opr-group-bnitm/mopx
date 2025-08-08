@@ -237,8 +237,8 @@ workflow annotate_draft {
 }
 
 
-if (params.overwrite_medaka) {
-    params.medaka_consensus_model = params.overwrite_medaka
+if (!params.medaka_consensus_model) {
+    params.medaka_consensus_model = "${workflow.projectDir}/${params.medaka_consensus_model_default}"
 }
 
 workflow {

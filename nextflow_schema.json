@@ -44,10 +44,10 @@
             ],
             "fa_icon": "far fa-folder"
         },
-        "overwrite_medaka": {
+        "medaka_consensus_model": {
           "title": "Medaka model",
           "type": "string",
-          "default": "output",
+          "default": null,
           "format": "path",
           "description": "Medaka model for variant calling and consensus creation.",
           "help_text": "Leave empty to use default (r1041_e82_400bps_hac_v4.1.0_model_pt.tar.gz).",
