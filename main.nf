@@ -41,6 +41,7 @@ include {
     variants_from_alignment;
     annotate_aa_changes;
     // general
+    report;
     output
 } from './lib/processes.nf'
 
@@ -221,6 +222,7 @@ workflow annotate_draft {
             vcf_variants | map {meta, vcf, tbi, genetable, var_summary -> [var_summary, 'annotation', 'variant_summary.html']}
         )
     emit:
+        variants = vcf_variants
         write_this = write_this
 }
 
@@ -285,15 +287,25 @@ workflow {
     ] }
     | annotate_draft
 
+    // report
+    html_report = draft 
+    | map {draft, basecounts -> {draft}}
+    | combine(annotation.variants | map { meta, vcf, tbi, genetable, var_summary -> vcf })
+    | map {draft, vcf -> ["sample", draft, vcf]}  // TODO: replace placeholder "sample"
+    | report
+
     Channel.empty()
     | mix(
         (draft_results ? draft_results.write_this : Channel.empty()),
-        annotation.write_this
+        annotation.write_this,
+        html_report | map { samplename, report -> [report, 'report', "${samplename}_report.html"] }
     )
     | output
 }
 
 
 // TODO:
-// - chose reference
-// - report + output
+// - automatic reference choice
+// - mulitple samples at once
+// - more report
+//   - histogram with read distribution: mpox reads and all reads (similar to vimop)

@@ -664,9 +664,22 @@ process annotate_aa_changes {
 }
 
 
-// process report {
-// TODO
-// }
+process report {
+    label "common"
+    cpus 1
+    input:
+        tuple val(samplename), path("final_draft.fasta"), path("variants.vcf.gz")
+    output:
+        tuple val(samplename), path("report.html")
+    """
+    report.py \\
+        --samplename ${samplename} \\
+        --mopx-version ${workflow.manifest.version} \\
+        --draft final_draft.fasta \\
+        --vcf variants.vcf.gz \\
+        --out report.html
+    """
+}
 
 
 process output {
