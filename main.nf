@@ -1,3 +1,7 @@
+// Copyright (c) 2025 Outbreak Preparedness and Response Group at BNITM
+// This file is part of MOPX and is licensed under the MIT License.
+// See the LICENSE file in the root of this repository for full license details.
+
 nextflow.enable.dsl = 2
 
 include {
@@ -35,8 +39,6 @@ include {
     mafft_align;
     shift_gaps;
     variants_from_alignment;
-    variants_report;
-    annotate_cds_changes;
     annotate_aa_changes;
     // general
     output
@@ -206,17 +208,6 @@ workflow annotate_draft {
         | map {meta, alignment -> [meta, alignment, meta.basecounts]}
         | variants_from_alignment
 
-        // TODO: remove variants_report? and aa_report?
-        // - replace with annotation based on ORF to AA alignments as done for
-        //   the genome annotations? 
-        variant_report = variants
-        | map {meta, vcf, tbi -> [meta, meta.genbank, vcf, tbi]}
-        | variants_report
-
-        aa_report = alignment
-        | map {meta, alignment -> [meta, alignment, meta.genbank]}
-        | annotate_cds_changes
-
         vcf_variants = variants
         | map {meta, vcf, tbi -> [meta, meta.genbank, vcf, tbi]}
         | annotate_aa_changes
@@ -224,13 +215,10 @@ workflow annotate_draft {
         write_this = Channel.empty()
         | mix(
             alignment | map {meta, align -> [align, 'annotation', 'alignment.fasta']},
-            variant_report | map {meta, report -> [report, 'annotation', 'variant_report.txt']},
             vcf_variants | map {meta, vcf, tbi, genetable, var_summary -> [vcf, 'annotation', 'variants.vcf.gz']},
             vcf_variants | map {meta, vcf, tbi, genetable, var_summary -> [tbi, 'annotation', 'variants.vcf.gz.tbi']},
             vcf_variants | map {meta, vcf, tbi, genetable, var_summary -> [genetable, 'annotation', 'gene_variant_summary.txt']},
-            vcf_variants | map {meta, vcf, tbi, genetable, var_summary -> [var_summary, 'annotation', 'variant_summary.html']},
-            aa_report | map {meta, aa_align, transfers -> [aa_align, 'annotation', 'protein_alignments.txt']},
-            aa_report | map {meta, aa_align, transfers -> [transfers, 'annotation', 'cds_transfer.tsv']}
+            vcf_variants | map {meta, vcf, tbi, genetable, var_summary -> [var_summary, 'annotation', 'variant_summary.html']}
         )
     emit:
         write_this = write_this

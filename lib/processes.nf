@@ -1,5 +1,8 @@
-nextflow.enable.dsl = 2
+// Copyright (c) 2025 Outbreak Preparedness and Response Group at BNITM
+// This file is part of MOPX and is licensed under the MIT License.
+// See the LICENSE file in the root of this repository for full license details.
 
+nextflow.enable.dsl = 2
 
 process concat_fastq_files {
     label "common"
@@ -617,34 +620,6 @@ process variants_from_alignment {
 }
 
 
-process variants_report {
-    label "common"
-    cpus 1
-    input:
-        tuple val(meta), path("annotations.gb"), path("variants.vcf.gz"), path("variants.vcf.gz.tbi")
-    output:
-        tuple val(meta), path("report.txt")
-    """
-    variants_report.py --variants variants.vcf.gz --gb annotations.gb > report.txt
-    """
-}
-
-
-process annotate_cds_changes {
-    label "common"
-    cpus 1
-    input:
-        tuple val(meta), path("alignment.fasta"), path("annotations.gb")
-    output:
-        tuple val(meta), path("alignments.txt"), path("transfers.tsv")
-    """
-    annotate.py --alignment alignment.fasta --gb annotations.gb --out out
-    mv out/transfers.tsv transfers.tsv
-    mv out/alignments.txt alignments.txt
-    """
-}
-
-
 process annotate_aa_changes {
     label "common"
     cpus 1
@@ -689,7 +664,13 @@ process annotate_aa_changes {
 }
 
 
+// process report {
+// TODO
+// }
+
+
 process output {
+    label "common"
     // publish inputs to output directory
     cpus 1
     publishDir (
