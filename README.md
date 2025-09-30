@@ -1,2 +1,2 @@
-# Metagenomics Orthopoxvirus Pipline X (MOPX)
+# Metagenomics Orthopoxvirus Pipeline X (MOPX)
 
