@@ -311,7 +311,8 @@ def read_variants(fname):
             }
             annotations = vcf_info(variant, 'ANN', cols_ann)
             basecounts = vcf_info(variant, 'BASECOUNTS', cols_basecounts)
-            lines.append(variant_info | annotations | basecounts)
+            if variant_info['Alt'].strip() != 'N':
+                lines.append(variant_info | annotations | basecounts)
     return pd.DataFrame(lines)
 
 
@@ -343,7 +344,14 @@ def html_report(
         ).legend(cols)
 
     with report.add_section("Variants", "Variants"):
-        cols = ['Position', 'Ref', 'Alt']
+        cols = [
+            'Position',
+            'Ref',
+            'Alt',
+            'Annotation',
+            'Gene_Name',
+            'HGVS.p',
+        ]
         DataTable.from_pandas(
             variants[cols],
             use_index=False,
@@ -353,7 +361,10 @@ def html_report(
             {
                 'Position': 'Genomic position of the variant.',
                 'Ref': 'Reference that is mutated.',
-                'Alt': 'Mutated seqeunce.'
+                'Alt': 'Mutated seqeunce.',
+                'Annotation': 'Class of the mutation impact.',
+                'Gene_Name': 'Name of the gene.',
+                'HGVS.p': 'Amino acid sequence change',
             },
             'Variants'
         ).legend(cols)
