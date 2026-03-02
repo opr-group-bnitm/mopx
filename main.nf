@@ -172,7 +172,7 @@ workflow draft_genome {
             raw_draft | map {meta, draft, log -> [draft, 'draft', 'raw_draft.fasta']},
             raw_draft | map {meta, draft, log -> [log, 'logs', 'raw_draft.log']},
             tr_annotated_draft | map {meta, draft, alignment, tr_range -> [alignment, 'repeat_transfer', 'alignment.fasta']},
-            tr_annotated_draft | map {meta, draft, alignment, tr_range -> [alignment, 'repeat_transfer', 'range.txt']},
+            tr_annotated_draft | map {meta, draft, alignment, tr_range -> [tr_range, 'repeat_transfer', 'range.txt']},
             polished_draft | map {meta, draft -> [draft, 'draft', 'polished.fasta']},
             draft_with_corrected_hairpin | map {meta, draft, basecounts -> [draft, 'draft', 'draft_final.fasta']},
             draft_with_corrected_hairpin | map {meta, draft, basecounts -> [basecounts, 'draft', 'basecounts_final.tsv']},

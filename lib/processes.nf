@@ -221,7 +221,7 @@ process assign_terminal_hairpin_region {
         --hairpin hairpin.fasta \\
         --genome polished_draft.fasta \\
         --margin 300 \\
-        --flanking_region_diff_tolerance 50 \\
+        --flanking_region_diff_tolerance 75 \\
         --out .
     """
 }
