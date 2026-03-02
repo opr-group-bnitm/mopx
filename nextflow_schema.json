@@ -1,11 +1,11 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
-  "$id": "https://raw.githubusercontent.com/OPR-group-BNITM/mopx/nextflow_schema.json",
-  "title": "OPR-group-BNITM/mopx",
+  "$id": "https://raw.githubusercontent.com/opr-group-bnitm/mopx/nextflow_schema.json",
+  "title": "opr-group-bnitm/mopx",
   "workflow_title": "MOPX: Metagenomics Orthopoxvirus Pipeline X",
   "description": "Genome reconstruction pipeline for Orthopoxvirus from nanopore metagenomics data.",
   "demo_url": "",
-  "url": "https://github.com/OPR-group-BNITM/mopx",
+  "url": "https://github.com/opr-group-bnitm/mopx",
   "type": "object",
   "resources": {
     "recommended": {
