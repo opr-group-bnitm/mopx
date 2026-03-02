@@ -270,7 +270,6 @@ workflow {
             hairpin: hairpin_fasta,
             medaka_model: medaka_model
         ]}
-        // TODO: pass on the sample-ID!
         draft_results = draft_input | draft_genome
         draft = draft_results.draft | map { meta, draft, basecounts -> [draft, basecounts] }
     } else {
@@ -291,7 +290,7 @@ workflow {
     html_report = draft 
     | map {draft, basecounts -> {draft}}
     | combine(annotation.variants | map { meta, vcf, tbi, genetable, var_summary -> vcf })
-    | map {draft, vcf -> ["sample", draft, vcf]}  // TODO: replace placeholder "sample"
+    | map {draft, vcf -> ["sample", draft, vcf]}
     | report
 
     Channel.empty()
@@ -302,10 +301,3 @@ workflow {
     )
     | output
 }
-
-
-// TODO:
-// - automatic reference choice
-// - mulitple samples at once
-// - more report
-//   - histogram with read distribution: mpox reads and all reads (similar to vimop)

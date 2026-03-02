@@ -260,10 +260,10 @@ class Legends:
 def genome_properties(fname):
     genome = SeqIO.read(fname, 'fasta')
     len_genome = len(genome.seq)
-    recoverage = 1 - str(genome.seq).count('N') / len_genome
+    recoverage = (1 - str(genome.seq).count('N') / len_genome) * 100
     properties = {
         'Genome Length': len_genome,
-        'Recovered': recoverage,
+        'Recovered': f'{recoverage:.2f}%',
     }
     return pd.DataFrame([properties])
 
