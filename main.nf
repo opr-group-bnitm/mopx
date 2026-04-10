@@ -169,14 +169,16 @@ workflow draft_genome {
 
         write_this = Channel.empty()
         | mix(
-            raw_draft | map {meta, draft, log -> [draft, 'draft', 'raw_draft.fasta']},
-            raw_draft | map {meta, draft, log -> [log, 'logs', 'raw_draft.log']},
-            tr_annotated_draft | map {meta, draft, alignment, tr_range -> [alignment, 'repeat_transfer', 'alignment.fasta']},
-            tr_annotated_draft | map {meta, draft, alignment, tr_range -> [tr_range, 'repeat_transfer', 'range.txt']},
+            // TODO: add a debug mode to add these files back in only if debug flag is set
+            // raw_draft | map {meta, draft, log -> [draft, 'draft', 'raw_draft.fasta']},
+            // raw_draft | map {meta, draft, log -> [log, 'logs', 'raw_draft.log']},
+            // hairpin_consensus | map {meta, hp_cons -> [hp_cons, 'draft', 'terminal_hairpin.fasta']},
+            // tr_annotated_draft | map {meta, draft, alignment, tr_range -> [alignment, 'repeat_transfer', 'alignment.fasta']},
+            // tr_annotated_draft | map {meta, draft, alignment, tr_range -> [tr_range, 'repeat_transfer', 'range.txt']},
+            //contigs_eval | map {meta, table -> [table, 'stats', 'contigs_eval.tsv']}
             polished_draft | map {meta, draft -> [draft, 'draft', 'polished.fasta']},
             draft_with_corrected_hairpin | map {meta, draft, basecounts -> [draft, 'draft', 'draft_final.fasta']},
             draft_with_corrected_hairpin | map {meta, draft, basecounts -> [basecounts, 'draft', 'basecounts_final.tsv']},
-            hairpin_consensus | map {meta, hp_cons -> [hp_cons, 'draft', 'terminal_hairpin.fasta']},
             alignments_reads_to_polished | map {meta, draft, bam, bai -> [bam, 'alignments', 'reads_vs_polished.bam']},
             alignments_reads_to_polished | map {meta, draft, bam, bai -> [bai, 'alignments', 'reads_vs_polished.bam.bai']},
             contigs_mapped_to_polished | map {meta, draft, bam, bai -> [bam, 'alignments', 'contigs_vs_polished.bam']},
@@ -185,7 +187,6 @@ workflow draft_genome {
             contigs_mapped_to_ref | map {meta, draft, bam, bai -> [bai, 'alignments', 'contigs_vs_ref.bam.bai']},
             reads_mapped_to_ref | map {meta, draft, bam, bai -> [bam, 'alignments', 'reads_vs_ref.bam']},
             reads_mapped_to_ref | map {meta, draft, bam, bai -> [bai, 'alignments', 'reads_vs_ref.bam.bai']},
-            contigs_eval | map {meta, table -> [table, 'stats', 'contigs_eval.tsv']}
         )
     emit:
         // emit everything that is used next
