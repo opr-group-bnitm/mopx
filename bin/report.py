@@ -295,7 +295,14 @@ def vcf_info(variant, header_name, headers):
     return {}
 
 
-def read_variants(fname):
+def truncate_variant_seq(sequence, max_length=10):
+    if len(sequence) > max_length:
+        sequence = sequence[:max_length] + '...'
+    return sequence
+
+
+
+def read_variants(fname, maxlen=10):
     lines = []
     with pysam.VariantFile(fname, 'r') as vcf:
         cols_ann = vcf_header_columns(vcf, 'ANN')
@@ -304,8 +311,8 @@ def read_variants(fname):
             variant_info = {
                 'Reference': variant.chrom,
                 'Position': variant.pos,
-                'Ref': variant.ref,
-                'Alt': ','.join(str(alt) for alt in variant.alts),
+                'Ref': truncate_variant_seq(variant.ref, maxlen),
+                'Alt': ','.join(truncate_variant_seq(str(alt), maxlen) for alt in variant.alts),
                 'Qual': variant.qual,
                 'Filter': variant.filter.keys()
             }

@@ -2,3 +2,4 @@ out
 .nextflow.log*
 .nextflow
 work
+data/references/*.fasta.fai
